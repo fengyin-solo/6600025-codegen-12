@@ -1,9 +1,12 @@
 <script setup lang="ts">
+import { ref } from 'vue';
 import { useCanBusStore } from './store/canbus';
 import FrameTable from './components/FrameTable.vue';
 import SignalChart from './components/SignalChart.vue';
+import SignalHealth from './components/SignalHealth.vue';
 
 const store = useCanBusStore();
+const currentPage = ref<'monitor' | 'health'>('monitor');
 
 function handleLoadDbc() {
   store.loadMockDbc();
@@ -35,48 +38,89 @@ function handleExport() {
         <h1 class="text-lg font-bold text-gray-100">CAN 总线数据帧解析与诊断仪</h1>
       </div>
 
-      <div class="flex items-center gap-2">
-        <button
-          @click="handleLoadDbc"
-          class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-200 text-sm rounded transition-colors border border-gray-600"
-        >
-          加载DBC
-        </button>
-        <button
-          @click="store.isCapturing ? store.stopCapture() : store.startCapture()"
-          class="px-3 py-1.5 text-sm rounded transition-colors font-medium"
-          :class="store.isCapturing
-            ? 'bg-red-600 hover:bg-red-700 text-white'
-            : 'bg-green-600 hover:bg-green-700 text-white'"
-        >
-          {{ store.isCapturing ? '停止捕获' : '开始捕获' }}
-        </button>
-        <button
-          @click="store.clearFrames()"
-          class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-200 text-sm rounded transition-colors border border-gray-600"
-        >
-          清除
-        </button>
-        <button
-          @click="handleExport"
-          class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-200 text-sm rounded transition-colors border border-gray-600"
-        >
-          导出CSV
-        </button>
+      <div class="flex items-center gap-4">
+        <div class="flex items-center bg-gray-900 rounded-lg p-0.5">
+          <button
+            @click="currentPage = 'monitor'"
+            class="px-3 py-1.5 text-sm rounded-md transition-colors"
+            :class="currentPage === 'monitor'
+              ? 'bg-cyan-600 text-white'
+              : 'text-gray-400 hover:text-gray-200'"
+          >
+            实时监控
+          </button>
+          <button
+            @click="currentPage = 'health'"
+            class="px-3 py-1.5 text-sm rounded-md transition-colors flex items-center gap-1.5"
+            :class="currentPage === 'health'
+              ? 'bg-cyan-600 text-white'
+              : 'text-gray-400 hover:text-gray-200'"
+          >
+            <span class="w-2 h-2 rounded-full" :class="{
+              'bg-green-500': store.healthSummary.criticalCount === 0 && store.healthSummary.warningCount === 0,
+              'bg-yellow-500': store.healthSummary.warningCount > 0 && store.healthSummary.criticalCount === 0,
+              'bg-red-500': store.healthSummary.criticalCount > 0
+            }"></span>
+            健康评分
+          </button>
+        </div>
+
+        <div class="w-px h-6 bg-gray-700"></div>
+
+        <div class="flex items-center gap-2">
+          <button
+            @click="handleLoadDbc"
+            class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-200 text-sm rounded transition-colors border border-gray-600"
+          >
+            加载DBC
+          </button>
+          <button
+            @click="store.isCapturing ? store.stopCapture() : store.startCapture()"
+            class="px-3 py-1.5 text-sm rounded transition-colors font-medium"
+            :class="store.isCapturing
+              ? 'bg-red-600 hover:bg-red-700 text-white'
+              : 'bg-green-600 hover:bg-green-700 text-white'"
+          >
+            {{ store.isCapturing ? '停止捕获' : '开始捕获' }}
+          </button>
+          <button
+            @click="store.clearFrames()"
+            class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-200 text-sm rounded transition-colors border border-gray-600"
+          >
+            清除
+          </button>
+          <button
+            v-if="currentPage === 'monitor'"
+            @click="handleExport"
+            class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-200 text-sm rounded transition-colors border border-gray-600"
+          >
+            导出CSV
+          </button>
+        </div>
       </div>
     </header>
 
     <!-- Main Area -->
     <main class="flex-1 flex overflow-hidden">
-      <!-- Left Panel: Frame Table (60%) -->
-      <div class="w-3/5 border-r border-gray-700 flex flex-col overflow-hidden">
-        <FrameTable />
-      </div>
+      <!-- Monitor Page -->
+      <template v-if="currentPage === 'monitor'">
+        <!-- Left Panel: Frame Table (60%) -->
+        <div class="w-3/5 border-r border-gray-700 flex flex-col overflow-hidden">
+          <FrameTable />
+        </div>
 
-      <!-- Right Panel: Signal Chart (40%) -->
-      <div class="w-2/5 flex flex-col overflow-hidden">
-        <SignalChart />
-      </div>
+        <!-- Right Panel: Signal Chart (40%) -->
+        <div class="w-2/5 flex flex-col overflow-hidden">
+          <SignalChart />
+        </div>
+      </template>
+
+      <!-- Health Page -->
+      <template v-else>
+        <div class="w-full flex flex-col overflow-hidden">
+          <SignalHealth />
+        </div>
+      </template>
     </main>
 
     <!-- Status Bar -->
@@ -89,11 +133,22 @@ function handleExport() {
         </span>
         <span>DBC消息: {{ store.dbcMessages.size }}</span>
       </div>
-      <div class="flex items-center gap-4 text-gray-500">
+      <div v-if="currentPage === 'monitor'" class="flex items-center gap-4 text-gray-500">
         <span>帧数: {{ store.busStats.totalFrames }}</span>
         <span>RX: {{ store.busStats.rxCount }}</span>
         <span>TX: {{ store.busStats.txCount }}</span>
         <span>负载: {{ store.busLoadPercent }}%</span>
+      </div>
+      <div v-else class="flex items-center gap-4 text-gray-500">
+        <span>信号数: {{ store.healthSummary.totalSignals }}</span>
+        <span class="text-green-400">健康: {{ store.healthSummary.healthyCount }}</span>
+        <span class="text-yellow-400">警告: {{ store.healthSummary.warningCount }}</span>
+        <span class="text-red-400">危险: {{ store.healthSummary.criticalCount }}</span>
+        <span>平均分: <span :class="{
+          'text-green-400': store.healthSummary.averageScore >= 70,
+          'text-yellow-400': store.healthSummary.averageScore >= 40 && store.healthSummary.averageScore < 70,
+          'text-red-400': store.healthSummary.averageScore < 40
+        }">{{ store.healthSummary.averageScore }}</span></span>
       </div>
     </footer>
   </div>

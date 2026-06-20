@@ -36,3 +36,34 @@ export interface BusStats {
   busLoad: number;
   lastUpdate: number;
 }
+
+export type CollectionStage = 'recent' | 'midterm' | 'longterm';
+
+export interface SignalHealthMetrics {
+  fluctuation: number;
+  overLimitCount: number;
+  abnormalDuration: number;
+  averageValue: number;
+  maxValue: number;
+  minValue: number;
+  sampleCount: number;
+}
+
+export interface SignalHealthScore {
+  signalName: string;
+  unit: string;
+  overallScore: number;
+  riskLevel: 'healthy' | 'warning' | 'critical';
+  stages: Record<CollectionStage, SignalHealthMetrics>;
+  currentValue: number;
+  lastUpdate: number;
+}
+
+export interface HealthSummary {
+  totalSignals: number;
+  healthyCount: number;
+  warningCount: number;
+  criticalCount: number;
+  averageScore: number;
+  topRisks: SignalHealthScore[];
+}
